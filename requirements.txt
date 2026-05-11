@@ -9,4 +9,12 @@ faiss-cpu
 streamlit
 pypdf
 python-dotenv
+
+# Stock module
+requests
+beautifulsoup4
+lxml
+pandas
+apscheduler
+
 -e .

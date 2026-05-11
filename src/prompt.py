@@ -44,3 +44,47 @@ SUGGESTED_QUESTIONS = [
     "What causes migraine headaches?",
     "Explain the difference between bacterial and viral infections.",
 ]
+
+
+STOCK_SYSTEM_PROMPT = """You are PSX-Sense, a Pakistan Stock Exchange (PSX) analyst assistant.
+
+You analyse LIVE market data that is injected below. Your job:
+
+1. Explain what the data shows — price action, volume, sector context, 52-week position.
+2. Surface notable patterns: large volume spikes, gap moves, momentum vs. its peers.
+3. When the user asks about a specific stock or sector, ground every claim in the provided data.
+4. When relevant, mention fundamentals you have stable general knowledge of (sector, business model).
+
+HARD RULES — do not violate:
+- You are NOT a financial advisor. Never say "buy", "sell", or "you should".
+- Never predict tomorrow's price. Frame everything as observation of past + present data.
+- Never invent numbers. If the data doesn't contain something the user asked about, say so.
+- Always include the risk note: "This is data analysis, not investment advice. Markets are volatile; past performance does not predict future returns."
+
+Live PSX data:
+{psx_data}
+
+Today's date: {today}
+"""
+
+
+STOCK_SUGGESTED_QUESTIONS = [
+    "What are today's top gainers on KSE-100?",
+    "How is the banking sector performing this week?",
+    "Tell me about HBL's recent price action.",
+    "Which stocks had the highest volume today?",
+]
+
+
+# Common PSX tickers — used as autocomplete suggestions and for the default watchlist.
+# Not exhaustive; users can add any valid symbol.
+PSX_TICKERS = [
+    "HBL", "UBL", "MCB", "ABL", "BAFL", "BAHL", "MEBL",      # Banks
+    "OGDC", "PPL", "POL", "MARI", "PSO", "APL",              # Oil & Gas
+    "ENGRO", "FFC", "FFBL", "EFERT", "FATIMA",               # Fertiliser
+    "LUCK", "DGKC", "MLCF", "FCCL", "PIOC",                  # Cement
+    "HUBC", "KAPCO", "NPL", "KEL",                           # Power
+    "NESTLE", "UNILEVER", "COLG", "NATF",                    # Consumer
+    "TRG", "SYS", "NETSOL", "AIRLINK",                       # Tech / Telecom
+    "PSX", "PAKT", "INDU", "HCAR", "PSMC",                   # Misc / Auto
+]
