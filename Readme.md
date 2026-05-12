@@ -1,30 +1,42 @@
-# MediBot + PSX-Sense
+# MediBot + PSX-Sense + JobScout + RoadmapCoach
 
-A two-in-one Streamlit chatbot. One tab is a retrieval-augmented medical reference assistant (PDFs → FAISS → Groq Llama). The other tab is a live Pakistan Stock Exchange analyst (scraped PSX data → Groq Llama) with WhatsApp alerts driven by a background worker. Both tabs run entirely on the free Groq tier.
+A four-in-one Streamlit workbench for a senior engineer — built on open-source LLMs (hosted free on Groq).
+
+- **Tab 1: Bring-your-own-books RAG chatbot** — upload any PDFs (medical, finance, legal, technical) → chunked, embedded, indexed in FAISS, queried with citations.
+- **Tab 2: Live PSX stock analyst** — chat grounded in real-time Pakistan Stock Exchange data scraped from `dps.psx.com.pk`.
+- **Tab 3: Premium Jobs Finder** — aggregate high-paying global roles from RemoteOK, Remotive, Arbeitnow + optional Adzuna and JSearch (legal proxy for LinkedIn / Indeed / Glassdoor). Filter by salary, search, remote-only, then ask an LLM to rank fit and spot skill gaps from your pasted profile.
+- **Tab 4: Top-1% Engineer Roadmap** — checklist across 10 skill tracks (Data Engineering / Snowflake, Data Analysis, Python, Oracle, Odoo, System Design, Cloud, AI/ML, DevOps, Full-Stack Craft) with progress persisted to disk and an LLM coach that picks your next milestones.
 
 ## Features
 
-### 🩺 Medical (RAG)
-- Multiple Groq models — Llama 3.3 70B, Llama 3.1 8B, Gemma 2 9B, Llama 3 70B
-- Streaming responses, source citations (file + page), 0–8 turns of rolling memory
-- Strict context-only mode or context+general-knowledge mode
-- Runtime PDF upload — chunked, embedded, merged into FAISS
-- Clear / export chat as Markdown
-- Adjustable top-k (1–8) and temperature (0.0–1.0)
+### 📚 Books / RAG tab
+- **Open-source models on Groq** — GPT-OSS 120B (strongest reasoning), Llama 3.3 70B, Qwen 3 32B, Llama 3.1 8B (fastest).
+- **Streaming responses** with source citations (file + page number).
+- **Two modes** — Strict (context-only) or Assisted (supplements with general knowledge, clearly marked).
+- **Conversational by default** — greetings ("hi", "thanks") get natural replies, not "I don't have information on that".
+- **Runtime PDF upload** — chunked, embedded, merged into the FAISS index without restart.
+- **Adjustable** top-k retrieval (1–8), temperature (0.0–1.0), conversation memory (0–8 turns).
+- **Clear / export** chat as Markdown.
 
-### 📈 Stocks (Live PSX)
-- Live PSX market-watch scraped from `dps.psx.com.pk` (cached 60s)
-- Top gainers / losers / volume leaders panels
-- Personal watchlist with quote table
-- Groq Llama streaming chat — grounded in live PSX data injected into the system prompt
-- Watchlist alert rules: `rise_pct`, `drop_pct`, `price_above`, `price_below`
-- **WhatsApp delivery via Meta Cloud API** (free 1000 conversations/month, headless, official)
-- **Broadcast list** — add multiple recipients; one alert fans out to all (Cloud API can't post to groups)
-- **Daily briefings 3× per day** (Open / Midday / Close) — configurable times in PKT
-- **Instant briefing** button — push a live market summary on demand
-- Background `alert_worker.py` poller — fires alerts during market hours (Mon–Fri 09:30–15:30 PKT)
-- Per-rule cooldown so a triggered alert doesn't spam every cycle
-- "Not investment advice" banner on every chat reply
+### 📈 Stocks tab
+- **Live PSX market-watch** scraped from `dps.psx.com.pk` (cached 60s, ~487 symbols).
+- **Top gainers / losers / volume leaders** panels with sortable tables.
+- **Personal watchlist** — pick from common PSX tickers or type your own; watchlist quotes get injected into the LLM context.
+- **Chat grounded in live data** — the LLM never invents prices, refuses to predict future moves, and always cites the live snapshot.
+- **Market-status indicator** (Open / Closed in PKT).
+
+### 💼 Jobs Finder tab
+- **Multi-source aggregator** — fans out to RemoteOK, Remotive, Arbeitnow in parallel (no API key required). Optional Adzuna (10 countries with salary data) and JSearch (LinkedIn / Indeed / Glassdoor / ZipRecruiter listings) when their keys are present.
+- **Filters** — keyword search, minimum USD-equivalent salary, remote-only toggle, source picker.
+- **De-duplicated, salary-ranked table** — postings sorted by midpoint USD desc. Click any row to apply.
+- **Profile-aware fit analysis** — paste your resume/profile in the sidebar; the LLM ranks the snapshot by fit, surfaces recurring skills in top-paying postings, and drafts cover-letter angles.
+- **Why no direct LinkedIn scraping** — their ToS prohibits it and they IP-ban scrapers within minutes. JSearch is the legal route to the same listings.
+
+### 🎯 Career Roadmap tab
+- **10 default skill tracks** — Data Engineering (Snowflake / dbt / Airflow / Spark / Kafka), Data Analysis & BI, Python Mastery, Oracle & Databases, Odoo & ERP, System Design, Cloud (AWS / GCP / Azure), AI / ML Engineering, DevOps & Platform, Full-Stack Craft.
+- **Milestone-level checkboxes** with notes — each milestone tagged `core / advanced / expert`.
+- **Progress persisted** to `data/roadmap.json` — survives restarts. Reset-to-defaults button in the sidebar.
+- **LLM mentor (RoadmapCoach)** — sees your full progress and recommends next milestones, sequencing, resources, and effort estimates based on what you've already checked.
 
 ## Setup
 
@@ -35,68 +47,37 @@ pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```
-GROQ_API_KEY=...                # used by both tabs
+GROQ_API_KEY=...
 
-# WhatsApp Cloud API (Stocks tab only)
-WHATSAPP_PHONE_NUMBER_ID=...    # the bot's sending-number ID
-WHATSAPP_ACCESS_TOKEN=...       # temporary 24h token, or a permanent System User token
+# Optional — enable extra job-board sources:
+ADZUNA_APP_ID=...
+ADZUNA_APP_KEY=...
+RAPIDAPI_KEY=...
 ```
 
-- Groq key: https://console.groq.com/keys (free tier)
-- Meta WhatsApp Cloud API setup is documented below.
+- Groq key (required): https://console.groq.com/keys
+- Adzuna keys (optional, free ~250 calls/month, salary data): https://developer.adzuna.com/
+- RapidAPI key (optional, free 200 calls/month, JSearch covers LinkedIn / Indeed / Glassdoor): https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch
 
 ## Run
-
-### Streamlit UI
 
 ```bash
 streamlit run medibot.py
 ```
 
-Switch between **Medical (RAG)** and **Stocks (Live PSX)** in the sidebar.
+Switch between **Medical (RAG)**, **Stocks (Live PSX)**, **Jobs Finder**, and **Career Roadmap** in the sidebar.
 
-### PSX → WhatsApp alert worker
+## Build the RAG index from disk
 
-```bash
-python alert_worker.py
-```
-
-Options:
-- `--interval 120` — poll every 2 minutes (default 180s)
-- `--off-hours`   — poll outside PSX market hours
-- `--once`        — single cycle then exit (useful for `cron` / Task Scheduler)
-
-### Meta WhatsApp Cloud API setup (one-time)
-
-1. Go to https://developers.facebook.com/ → **Create App** → use case **Other** → **Business** → name it anything (e.g. "PSX-Sense").
-2. In the app's left nav, click **Add Product** → **WhatsApp** → **Set up**.
-3. Open **WhatsApp → API Setup**. You'll see:
-   - **From**: a Meta-provided test phone number with its **Phone number ID** — copy this into `WHATSAPP_PHONE_NUMBER_ID`.
-   - **Temporary access token** (24h) — copy into `WHATSAPP_ACCESS_TOKEN`.
-4. Under **To**, add each recipient's WhatsApp number. Meta texts them an OTP — enter it to verify.
-5. From each recipient's phone, **send "hi" to the bot's WhatsApp number** (the "From" number). This opens the 24-hour freeform window so the bot can message them.
-6. In Streamlit (Stocks mode), add the same numbers under **WhatsApp recipients** and hit **📨 Test** next to one to confirm the connection.
-7. Enable **Daily briefings** with three time slots (default 09:30 / 12:30 / 15:30 PKT).
-8. Add **Threshold alerts** (rule + threshold) as desired.
-9. Launch `python alert_worker.py` in a separate terminal — leave it running.
-
-### Cloud API limits to know
-- **No group sending.** Cloud API cannot post into WhatsApp groups; it fans out one-by-one to a recipient list.
-- **24-hour window.** Freeform text only works for 24h after the recipient's last inbound message. After that, you must use a pre-approved template (`send_template` in `src/whatsapp_alerts.py`). Easiest fix: text "hi" to the bot once a day.
-- **Test number** can message up to 5 verified recipients. For more, register a real business phone number in Meta Business Manager.
-- **Temporary token expires every 24h.** For long-running deployments, generate a permanent System User token in Meta Business Settings.
-
-## Index the medical PDFs
-
-Drop PDFs into `Data/` then run:
+Drop PDFs into `Data/`, then run:
 
 ```bash
 python app.py
 ```
 
-This builds `vectorstore/db_faiss/`. You can also upload PDFs at runtime from the Streamlit sidebar (Medical mode).
+This populates `vectorstore/db_faiss/`. You can also upload PDFs at runtime from the Streamlit sidebar (Books mode).
 
-## CLI version (medical only)
+## CLI version (RAG only)
 
 ```bash
 python connect_memory_withllm.py
@@ -105,23 +86,36 @@ python connect_memory_withllm.py
 ## Project layout
 
 ```
-medibot.py                  Streamlit UI (Medical + Stocks)
+medibot.py                  Streamlit UI (Books + Stocks + Jobs + Roadmap)
 app.py                      Build the FAISS index from Data/
-alert_worker.py             Background PSX poller → WhatsApp dispatcher
-connect_memory_withllm.py   CLI Q&A loop (medical only)
+connect_memory_withllm.py   CLI Q&A loop
 src/
   helper.py                 FAISS, Groq, RAG chain, PDF ingestion
   prompt.py                 System prompts + suggested questions + PSX tickers
-  stocks.py                 PSX scraper, watchlist persistence, alert engine
-  stock_chat.py             Groq streaming chat for the stock module
-  whatsapp_alerts.py        Meta WhatsApp Cloud API client
+  stocks.py                 PSX scraper + LLM context formatter
+  stock_chat.py             Groq streaming chat (reused by Jobs + Roadmap too)
+  jobs.py                   Multi-source job aggregator (RemoteOK, Remotive,
+                            Arbeitnow, Adzuna, JSearch)
+  roadmap.py                Skill-track checklist model + persistence
 Data/                       PDFs to be indexed
-data/
-  watchlist.json            Persisted watchlist + alert rules + cooldowns
+data/roadmap.json           Persisted roadmap progress (auto-seeded)
 vectorstore/db_faiss/       Persisted FAISS index
 ```
 
+## Models
+
+All models are open-source weight; inference is hosted free on Groq's API.
+
+| Model | Best for |
+|-------|----------|
+| `openai/gpt-oss-120b`     | Strongest reasoning (default) — OpenAI's open-weight Apache-2.0 release |
+| `llama-3.3-70b-versatile` | General-purpose, balanced |
+| `qwen/qwen3-32b`          | Reasoning, smaller |
+| `llama-3.1-8b-instant`    | Fastest replies |
+
+> **Note:** Groq decommissions models periodically. If you see `model_decommissioned` errors, check the live list at https://console.groq.com/docs/models and update `AVAILABLE_MODELS` in `src/helper.py` and `STOCK_LLM_MODELS` in `src/stock_chat.py`.
+
 ## Disclaimers
 
-- **Medical:** for educational/reference use only — not a substitute for professional medical advice. Always consult a qualified healthcare provider.
+- **Books / RAG:** for educational and reference use. For medical, legal, or financial decisions, consult a qualified professional.
 - **Stocks:** PSX-Sense is a data-analysis tool — *not* investment advice. It explains past and present numbers; it does not predict future prices. Markets are volatile; past performance does not predict future returns. Consult a SECP-licensed advisor before trading.

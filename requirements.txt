@@ -15,6 +15,5 @@ requests
 beautifulsoup4
 lxml
 pandas
-apscheduler
 
 -e .

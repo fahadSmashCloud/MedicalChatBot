@@ -20,10 +20,10 @@ MAX_TOKENS = 1500
 # Reuse the same Groq models the medical tab supports.
 # Llama 3.3 70B is the strongest free option for analysis-style answers.
 STOCK_LLM_MODELS = {
-    "Llama 3.3 70B (versatile)": "llama-3.3-70b-versatile",
-    "Llama 3.1 8B (instant)":    "llama-3.1-8b-instant",
-    "Gemma 2 9B":                "gemma2-9b-it",
-    "Llama 3 70B (legacy)":      "llama3-70b-8192",
+    "GPT-OSS 120B (strongest reasoning)": "openai/gpt-oss-120b",
+    "Llama 3.3 70B (balanced)":            "llama-3.3-70b-versatile",
+    "Qwen 3 32B (reasoning)":              "qwen/qwen3-32b",
+    "Llama 3.1 8B (fastest)":              "llama-3.1-8b-instant",
 }
 
 DEFAULT_MODEL = next(iter(STOCK_LLM_MODELS.values()))

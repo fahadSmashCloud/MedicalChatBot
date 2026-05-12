@@ -18,11 +18,14 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 DB_FAISS_PATH = "vectorstore/db_faiss"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
+# Open-source weight models currently live on Groq's free tier.
+# gpt-oss-120b is OpenAI's open-weight release (Apache 2.0) — strongest reasoning.
+# Verified live against https://api.groq.com/openai/v1/models on 2026-05-12.
 AVAILABLE_MODELS = {
-    "Llama 3.3 70B (versatile)": "llama-3.3-70b-versatile",
-    "Llama 3.1 8B (instant)": "llama-3.1-8b-instant",
-    "Gemma 2 9B": "gemma2-9b-it",
-    "Llama 3 70B (legacy)": "llama3-70b-8192",
+    "GPT-OSS 120B (strongest reasoning)": "openai/gpt-oss-120b",
+    "Llama 3.3 70B (balanced)":            "llama-3.3-70b-versatile",
+    "Qwen 3 32B (reasoning)":              "qwen/qwen3-32b",
+    "Llama 3.1 8B (fastest)":              "llama-3.1-8b-instant",
 }
 
 
