@@ -393,3 +393,15 @@ INTERVIEW_SUGGESTED_QUESTIONS = [
     "Run me through a verbal drill on system design.",
     "How do I structure a better behavioral answer using STAR?",
 ]
+
+
+# ── Agentic AI ────────────────────────────────────────────────────────────────
+
+AGENT_SUGGESTED_TASKS = [
+    "Search the web and summarise the latest news on large language models.",
+    "What is the compound interest on $10,000 at 7% for 25 years?",
+    "Search for the top 5 Python web frameworks and compare them.",
+    "Calculate the distance light travels in one year in kilometres.",
+    "Find and summarise what is quantum computing from a recent source.",
+    "What are the symptoms of Type 2 diabetes? (search medical knowledge base)",
+]

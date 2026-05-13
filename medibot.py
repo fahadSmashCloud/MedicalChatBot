@@ -36,6 +36,7 @@ from src.prompt import (
     INTERVIEW_EVAL_SYSTEM_PROMPT,
     INTERVIEW_CHAT_SYSTEM_PROMPT,
     INTERVIEW_SUGGESTED_QUESTIONS,
+    AGENT_SUGGESTED_TASKS,
 )
 from src.stock_chat import (
     STOCK_LLM_MODELS,
@@ -47,6 +48,7 @@ from src.stock_chat import (
 from src import stocks, jobs, roadmap
 from src import resume_analyzer, code_assistant, interview_guide
 from src import auth as auth_module
+from src import agent_core, agent_tools
 
 load_dotenv(find_dotenv())
 
@@ -187,6 +189,40 @@ st.markdown(
 
     /* ---- misc ---- */
     div[data-testid="stMetricValue"] { font-size: 1.4rem !important; }
+
+    /* ---- Agentic AI step cards ---- */
+    .agent-step {
+        border-radius: 8px; padding: 0.7rem 1rem;
+        margin-bottom: 0.55rem; font-size: 0.88rem; line-height: 1.5;
+        border-left: 4px solid transparent;
+    }
+    .agent-thought {
+        background: #1e2a3a; border-left-color: #4f8ef7;
+    }
+    .agent-action {
+        background: #1a2a1a; border-left-color: #4caf50;
+    }
+    .agent-observation {
+        background: #2a2a1a; border-left-color: #ff9800;
+        white-space: pre-wrap; font-family: monospace; font-size: 0.82rem;
+    }
+    .agent-final {
+        background: #2a1a3a; border-left-color: #a855f7;
+        font-weight: 500;
+    }
+    .agent-error {
+        background: #3a1a1a; border-left-color: #ef4444;
+    }
+    .agent-step-label {
+        font-size: 0.72rem; font-weight: 700; letter-spacing: 0.8px;
+        text-transform: uppercase; opacity: 0.7; margin-bottom: 0.25rem;
+    }
+    .agent-tool-badge {
+        display: inline-block; background: rgba(79,142,247,0.15);
+        border: 1px solid rgba(79,142,247,0.35); border-radius: 12px;
+        padding: 1px 9px; font-size: 0.72rem; font-weight: 600;
+        color: #4f8ef7; margin-left: 0.4rem;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -264,6 +300,12 @@ def init_state():
         "interview_show_hint": False,
         "interview_session_done": False,
         "interview_pending_answer": "",  # textarea draft
+        # agentic AI
+        "agent_model_label":   next(iter(STOCK_LLM_MODELS)),
+        "agent_max_iter":      8,
+        "agent_steps":         [],       # list[AgentStep] from last run
+        "agent_task":          "",       # last task string
+        "agent_enabled_tools": [t.name for t in agent_tools.TOOLS],
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -441,6 +483,7 @@ DOMAINS = [
     "Resume Analyzer",
     "Code Assistant",
     "Interview Guider",
+    "🤖 Agentic AI",
 ]
 ADMIN_DOMAINS = DOMAINS + ["🛡️ Admin Panel"]
 
@@ -782,6 +825,37 @@ with st.sidebar:
         st.divider()
         st.caption(f"🤖 `{STOCK_LLM_MODELS[st.session_state.interview_model_label]}`")
 
+    elif st.session_state.domain == "🤖 Agentic AI":
+        st.header("🤖 Agentic AI")
+        st.session_state.agent_model_label = st.selectbox(
+            "LLM",
+            list(STOCK_LLM_MODELS.keys()),
+            index=list(STOCK_LLM_MODELS.keys()).index(st.session_state.agent_model_label),
+            key="agent_model_sel",
+        )
+        st.session_state.agent_max_iter = st.slider(
+            "Max iterations", 1, 15,
+            st.session_state.agent_max_iter, key="agent_max_iter_slider",
+            help="Hard cap on how many Reason→Act→Observe loops the agent runs.",
+        )
+        st.divider()
+        st.subheader("🔧 Enable tools")
+        all_tool_names = [t.name for t in agent_tools.TOOLS]
+        selected_tools = []
+        for tname in all_tool_names:
+            spec = agent_tools.TOOLS_BY_NAME[tname]
+            checked = tname in st.session_state.agent_enabled_tools
+            if st.checkbox(tname, value=checked, key=f"tool_chk_{tname}",
+                           help=spec.description[:120]):
+                selected_tools.append(tname)
+        st.session_state.agent_enabled_tools = selected_tools
+        st.divider()
+        if st.button("🗑 Clear results", use_container_width=True, key="agent_clear_btn"):
+            st.session_state.agent_steps = []
+            st.session_state.agent_task  = ""
+            st.rerun()
+        st.caption(f"🤖 `{STOCK_LLM_MODELS[st.session_state.agent_model_label]}`")
+
     else:  # Code Assistant
         st.header("💻 Code Assistant")
         st.session_state.code_model_label = st.selectbox("LLM",
@@ -823,6 +897,7 @@ with st.sidebar:
         "Resume Analyzer":   "messages_resume",
         "Code Assistant":    "messages_code",
         "Interview Guider":  "messages_interview",
+        "🤖 Agentic AI":    None,   # agent has its own step-based UI, no chat buffer
         "🛡️ Admin Panel":   None,
     }
     domain_msg_key = _msg_key_map.get(st.session_state.domain)
@@ -1674,6 +1749,173 @@ def render_interview():
 
 
 # ============================================================================
+# MAIN — Agentic AI
+# ============================================================================
+
+_STEP_CONFIG = {
+    "thought":     ("💭 Thought",     "agent-thought"),
+    "action":      ("🔧 Action",      "agent-action"),
+    "observation": ("👁 Observation", "agent-observation"),
+    "final":       ("✅ Final Answer","agent-final"),
+    "error":       ("❌ Error",       "agent-error"),
+}
+
+
+def _render_agent_step(step: agent_core.AgentStep) -> None:
+    """Render one AgentStep as a styled HTML card."""
+    label_text, css_class = _STEP_CONFIG.get(
+        step.step_type, (step.step_type.title(), "agent-step")
+    )
+    badge = (
+        f'<span class="agent-tool-badge">{step.tool_name}</span>'
+        if step.tool_name else ""
+    )
+    # Escape HTML in content but preserve markdown code fences visually
+    import html as _html
+    safe_content = _html.escape(step.content)
+    st.markdown(
+        f'<div class="agent-step {css_class}">'
+        f'<div class="agent-step-label">{label_text}{badge}</div>'
+        f'<div style="white-space:pre-wrap;">{safe_content}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_agent() -> None:
+    st.markdown(
+        '<div class="main-header">🤖 Agentic AI</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="subtle">ReAct agent — Reason · Act · Observe · loop. '
+        'Powered by Groq function calling + real-world tools.</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="disclaimer-blue">'
+        '🔬 <strong>How it works:</strong> '
+        'The agent uses the <strong>ReAct pattern</strong> (Yao et al., 2022): '
+        'it <em>reasons</em> about the task, <em>selects a tool</em>, <em>observes</em> '
+        'the result, then loops until it has a confident final answer. '
+        'Each step is shown below in real-time. '
+        'The REST API (<code>api/main.py</code>) exposes this same agent over HTTP.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not os.environ.get("GROQ_API_KEY"):
+        st.error("**GROQ_API_KEY is not set.** Add it to your .env file.")
+        return
+
+    # ── Task input ────────────────────────────────────────────────────────────
+    st.divider()
+
+    # Example tasks as clickable chips
+    if not st.session_state.agent_steps:
+        st.subheader("💡 Try an example task")
+        cols = st.columns(2)
+        for i, example in enumerate(AGENT_SUGGESTED_TASKS):
+            if cols[i % 2].button(example, key=f"agent-ex-{i}", use_container_width=True):
+                st.session_state._agent_task_input = example
+                st.rerun()
+
+    task_value = st.session_state.pop("_agent_task_input", st.session_state.agent_task)
+    task = st.text_area(
+        "Task for the agent",
+        value=task_value,
+        height=100,
+        placeholder="What do you want the agent to research, calculate, or find?",
+        key="agent_task_input_area",
+    )
+
+    enabled_tools = st.session_state.agent_enabled_tools
+    if not enabled_tools:
+        st.warning("No tools selected. Enable at least one tool in the sidebar.")
+
+    run_clicked = st.button(
+        "▶ Run Agent",
+        type="primary",
+        use_container_width=True,
+        disabled=not task.strip() or not enabled_tools,
+    )
+
+    if run_clicked and task.strip():
+        st.session_state.agent_steps = []
+        st.session_state.agent_task  = task.strip()
+
+        model = STOCK_LLM_MODELS[st.session_state.agent_model_label]
+        max_iter = st.session_state.agent_max_iter
+
+        # Run agent — collect all steps, show a spinner (steps display after)
+        steps: list[agent_core.AgentStep] = []
+        progress_bar = st.progress(0, text="Agent starting…")
+
+        with st.spinner("Agent working…"):
+            gen = agent_core.run_agent(
+                task=task.strip(),
+                model=model,
+                max_iterations=max_iter,
+                enabled_tools=enabled_tools if enabled_tools else None,
+            )
+            action_count = 0
+            for step in gen:
+                steps.append(step)
+                if step.step_type == "action":
+                    action_count += 1
+                    pct = min(action_count / max_iter, 0.95)
+                    progress_bar.progress(pct, text=f"Step {action_count} / {max_iter} max…")
+
+        progress_bar.progress(1.0, text="Done.")
+        st.session_state.agent_steps = steps
+        st.rerun()
+
+    # ── Display stored steps ──────────────────────────────────────────────────
+    steps = st.session_state.agent_steps
+    if not steps:
+        return
+
+    task_label = st.session_state.agent_task
+    st.divider()
+    st.subheader(f"🔍 Reasoning trace — *{task_label[:80]}{'…' if len(task_label) > 80 else ''}*")
+
+    action_count = sum(1 for s in steps if s.step_type == "action")
+    final_steps  = [s for s in steps if s.step_type == "final"]
+    error_steps  = [s for s in steps if s.step_type == "error"]
+
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("Tool calls", action_count)
+    col_b.metric("Total steps", len(steps))
+    col_c.metric("Status", "✅ Done" if final_steps else ("❌ Error" if error_steps else "⏳"))
+
+    st.markdown("---")
+    for step in steps:
+        _render_agent_step(step)
+
+    # ── Final answer highlight ─────────────────────────────────────────────────
+    if final_steps:
+        st.divider()
+        st.subheader("📋 Final Answer")
+        st.markdown(final_steps[-1].content)
+
+    # ── API usage hint ─────────────────────────────────────────────────────────
+    with st.expander("🔌 Use this agent via REST API"):
+        st.markdown(
+            "Start the FastAPI server from the project root:\n"
+            "```bash\n"
+            "uvicorn api.main:app --reload --port 8000\n"
+            "```\n"
+            "Then call the agent:\n"
+            "```bash\n"
+            "curl -X POST http://localhost:8000/agent/run \\\n"
+            '  -H "Content-Type: application/json" \\\n'
+            f'  -d \'{{"task": "{task_label[:60]}...", "max_iterations": {st.session_state.agent_max_iter}}}\'\n'
+            "```\n"
+            "Interactive docs: **http://localhost:8000/docs**"
+        )
+
+
+# ============================================================================
 # Route
 # ============================================================================
 _ROUTES = {
@@ -1684,6 +1926,7 @@ _ROUTES = {
     "Resume Analyzer":   render_resume,
     "Code Assistant":    render_code,
     "Interview Guider":  render_interview,
+    "🤖 Agentic AI":    render_agent,
     "🛡️ Admin Panel":   render_admin_panel,
 }
 _ROUTES.get(st.session_state.domain, render_medical)()

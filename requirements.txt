@@ -45,4 +45,17 @@ beautifulsoup4
 lxml
 pandas
 
+# ── Agentic AI — REST API layer ───────────────────────────────────────────────
+# fastapi: ASGI web framework with automatic OpenAPI 3.0 generation
+#   Used in: api/main.py — exposes the ReAct agent as a REST API
+fastapi
+
+# uvicorn: ASGI server that serves the FastAPI application
+#   Run with: uvicorn api.main:app --reload --port 8000
+uvicorn[standard]
+
+# duckduckgo-search: DuckDuckGo web search (no API key required)
+#   Used in: src/agent_tools.py — _tool_search_web() (search_web agent tool)
+duckduckgo-search
+
 -e .
