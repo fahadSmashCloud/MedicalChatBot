@@ -31,6 +31,11 @@ streamlit
 # ── Document processing ───────────────────────────────────────────────────────
 pypdf               # PDF text extraction (resume_analyzer.py, helper.py)
 
+# ── Authentication ────────────────────────────────────────────────────────────
+# bcrypt: password hashing (work factor 12 by default — slow enough to resist brute-force)
+#   Used in: src/auth.py — register_user(), login_user(), change_password()
+bcrypt
+
 # ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv       # .env file loading
 

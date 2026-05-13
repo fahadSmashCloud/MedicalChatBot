@@ -46,6 +46,7 @@ from src.stock_chat import (
 )
 from src import stocks, jobs, roadmap
 from src import resume_analyzer, code_assistant, interview_guide
+from src import auth as auth_module
 
 load_dotenv(find_dotenv())
 
@@ -155,6 +156,35 @@ st.markdown(
         font-size: 0.83rem; color: #1e3a5f; margin-bottom: 1rem;
     }
 
+    /* ---- auth pages ---- */
+    .auth-card {
+        max-width: 420px; margin: 4rem auto; padding: 2.5rem 2rem;
+        background: white; border-radius: 16px;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.10);
+        border: 1px solid #e8e8ee;
+    }
+    .auth-logo {
+        text-align: center; font-size: 2.8rem; margin-bottom: 0.3rem;
+    }
+    .auth-title {
+        text-align: center; font-size: 1.4rem; font-weight: 700;
+        margin-bottom: 0.1rem; color: #1a1a2e;
+    }
+    .auth-subtitle {
+        text-align: center; font-size: 0.85rem; color: #888;
+        margin-bottom: 1.6rem;
+    }
+    .role-badge-superadmin {
+        display: inline-block; background: linear-gradient(90deg,#4f8ef7,#a855f7);
+        color: white; border-radius: 20px; padding: 2px 12px;
+        font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px;
+    }
+    .role-badge-user {
+        display: inline-block; background: #f0fdf4; color: #16a34a;
+        border: 1px solid #bbf7d0; border-radius: 20px; padding: 2px 12px;
+        font-size: 0.75rem; font-weight: 600;
+    }
+
     /* ---- misc ---- */
     div[data-testid="stMetricValue"] { font-size: 1.4rem !important; }
     </style>
@@ -216,6 +246,10 @@ def init_state():
         "code_temperature": 0.4,
         "code_memory_turns": 4,
         "code_language": "Python",   # selected language preset
+        # auth
+        "auth_user": None,          # dict with id/name/email/role, or None
+        "auth_page": "login",       # "login" | "register"
+        "auth_change_pw": False,    # show change-password form in sidebar
         # interview guider
         "messages_interview": [],
         "interview_model_label": next(iter(STOCK_LLM_MODELS)),
@@ -237,6 +271,7 @@ def init_state():
 
 
 init_state()
+auth_module.init_db()   # create tables + seed superadmin on first run
 
 
 @st.cache_resource(show_spinner=False)
@@ -247,6 +282,152 @@ def cached_vectorstore():
 @st.cache_data(ttl=60, show_spinner=False)
 def cached_market_watch():
     return stocks.fetch_market_watch()
+
+
+# ============================================================================
+# AUTH — Login / Register pages
+# ============================================================================
+def render_login():
+    st.markdown(
+        '<div class="auth-logo">🚀</div>'
+        '<div class="auth-title">AI Workbench</div>'
+        '<div class="auth-subtitle">Sign in to continue</div>',
+        unsafe_allow_html=True,
+    )
+    with st.form("login_form"):
+        email    = st.text_input("Email", placeholder="you@example.com")
+        password = st.text_input("Password", type="password", placeholder="••••••••")
+        submitted = st.form_submit_button("Sign In", use_container_width=True, type="primary")
+
+    if submitted:
+        if not email or not password:
+            st.error("Please enter your email and password.")
+        else:
+            ok, msg, user = auth_module.login_user(email, password)
+            if ok:
+                st.session_state.auth_user = user
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("Don't have an account? Register", use_container_width=True):
+        st.session_state.auth_page = "register"
+        st.rerun()
+
+
+def render_register():
+    st.markdown(
+        '<div class="auth-logo">🚀</div>'
+        '<div class="auth-title">Create Account</div>'
+        '<div class="auth-subtitle">Join AI Workbench — free forever</div>',
+        unsafe_allow_html=True,
+    )
+    with st.form("register_form"):
+        name     = st.text_input("Full name", placeholder="Your Name")
+        email    = st.text_input("Email", placeholder="you@example.com")
+        password = st.text_input("Password", type="password",
+                                  placeholder="Min 8 chars, upper + lower + digit")
+        confirm  = st.text_input("Confirm password", type="password", placeholder="••••••••")
+        submitted = st.form_submit_button("Create Account", use_container_width=True, type="primary")
+
+    if submitted:
+        if password != confirm:
+            st.error("Passwords do not match.")
+        else:
+            ok, msg = auth_module.register_user(name, email, password)
+            if ok:
+                st.success(msg)
+                st.session_state.auth_page = "login"
+                st.rerun()
+            else:
+                st.error(msg)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("Already have an account? Sign In", use_container_width=True):
+        st.session_state.auth_page = "login"
+        st.rerun()
+
+
+def render_auth_gate():
+    """Show login or register centered on the page — blocks all app content."""
+    # Narrow centered column trick
+    _, col, _ = st.columns([1, 1.6, 1])
+    with col:
+        if st.session_state.auth_page == "register":
+            render_register()
+        else:
+            render_login()
+
+
+# ============================================================================
+# ADMIN PANEL (superadmin only)
+# ============================================================================
+def render_admin_panel():
+    st.markdown('<div class="main-header">🛡️ Super Admin Panel</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtle">Manage all users, roles, and accounts.</div>', unsafe_allow_html=True)
+
+    users = auth_module.list_users()
+    total = len(users)
+    admins = sum(1 for u in users if u["role"] == "superadmin")
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total users", total)
+    m2.metric("Super admins", admins)
+    m3.metric("Regular users", total - admins)
+
+    st.divider()
+    st.subheader("👥 All users")
+
+    for u in users:
+        is_me = u["id"] == st.session_state.auth_user["id"]
+        with st.expander(
+            f"{'👑' if u['role'] == 'superadmin' else '👤'} {u['name']} — {u['email']}"
+            + (" *(you)*" if is_me else ""),
+            expanded=False,
+        ):
+            c1, c2, c3 = st.columns([2, 2, 1])
+            c1.markdown(f"**Role:** `{u['role']}`")
+            c2.markdown(f"**Joined:** {u['created_at'][:10]}")
+            c3.markdown(f"**Last login:** {(u['last_login'] or '—')[:10]}")
+
+            st.markdown("---")
+            col_role, col_pw, col_del = st.columns(3)
+
+            # Change role
+            with col_role:
+                new_role = st.selectbox(
+                    "Role", auth_module.ROLES,
+                    index=auth_module.ROLES.index(u["role"]),
+                    key=f"role_{u['id']}",
+                )
+                if st.button("Update role", key=f"upd_role_{u['id']}", use_container_width=True):
+                    ok, msg = auth_module.set_user_role(u["id"], new_role)
+                    (st.success if ok else st.error)(msg)
+                    st.rerun()
+
+            # Reset password
+            with col_pw:
+                new_pw = st.text_input("New password", type="password",
+                                        key=f"rpw_{u['id']}", placeholder="Force-reset")
+                if st.button("Reset password", key=f"do_rpw_{u['id']}", use_container_width=True):
+                    if new_pw:
+                        ok, msg = auth_module.admin_reset_password(u["id"], new_pw)
+                        (st.success if ok else st.error)(msg)
+                    else:
+                        st.warning("Enter a new password first.")
+
+            # Delete
+            with col_del:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if not is_me:
+                    if st.button("🗑 Delete", key=f"del_{u['id']}", use_container_width=True):
+                        ok, msg = auth_module.delete_user(u["id"])
+                        (st.success if ok else st.error)(msg)
+                        st.rerun()
+                else:
+                    st.caption("*(cannot delete yourself)*")
 
 
 # ============================================================================
@@ -261,8 +442,56 @@ DOMAINS = [
     "Code Assistant",
     "Interview Guider",
 ]
+ADMIN_DOMAINS = DOMAINS + ["🛡️ Admin Panel"]
+
+# ── Auth gate — block everything if not signed in ───────────────────────────
+if not st.session_state.auth_user:
+    render_auth_gate()
+    st.stop()
+
+# ── Signed in from here onward ───────────────────────────────────────────────
+_current_user = st.session_state.auth_user
+_is_superadmin = _current_user["role"] == "superadmin"
 
 with st.sidebar:
+    # -- User info strip ------------------------------------------------------
+    role_badge = (
+        '<span class="role-badge-superadmin">👑 Super Admin</span>'
+        if _is_superadmin else
+        '<span class="role-badge-user">👤 User</span>'
+    )
+    st.markdown(
+        f"**{_current_user['name']}**&nbsp; {role_badge}",
+        unsafe_allow_html=True,
+    )
+    st.caption(_current_user["email"])
+
+    col_logout, col_pw = st.columns(2)
+    if col_logout.button("🚪 Sign out", use_container_width=True):
+        st.session_state.auth_user = None
+        st.session_state.auth_page = "login"
+        st.rerun()
+    if col_pw.button("🔑 Password", use_container_width=True):
+        st.session_state.auth_change_pw = not st.session_state.get("auth_change_pw", False)
+        st.rerun()
+
+    if st.session_state.get("auth_change_pw"):
+        with st.form("change_pw_form"):
+            old_pw  = st.text_input("Current password", type="password")
+            new_pw  = st.text_input("New password", type="password")
+            conf_pw = st.text_input("Confirm new password", type="password")
+            if st.form_submit_button("Change password", use_container_width=True):
+                if new_pw != conf_pw:
+                    st.error("Passwords don't match.")
+                else:
+                    ok, msg = auth_module.change_password(_current_user["id"], old_pw, new_pw)
+                    (st.success if ok else st.error)(msg)
+                    if ok:
+                        st.session_state.auth_change_pw = False
+                        st.rerun()
+
+    st.divider()
+
     # -- Health status strip --------------------------------------------------
     api_ok = bool(os.environ.get("GROQ_API_KEY"))
     idx_ok = Path("vectorstore/db_faiss").exists()
@@ -274,10 +503,13 @@ with st.sidebar:
     )
     st.divider()
 
+    _domain_list = ADMIN_DOMAINS if _is_superadmin else DOMAINS
+    if st.session_state.domain not in _domain_list:
+        st.session_state.domain = "Medical (RAG)"
     st.session_state.domain = st.radio(
         "🧭 Domain",
-        DOMAINS,
-        index=DOMAINS.index(st.session_state.domain) if st.session_state.domain in DOMAINS else 0,
+        _domain_list,
+        index=_domain_list.index(st.session_state.domain),
     )
     st.divider()
 
@@ -591,14 +823,15 @@ with st.sidebar:
         "Resume Analyzer":   "messages_resume",
         "Code Assistant":    "messages_code",
         "Interview Guider":  "messages_interview",
+        "🛡️ Admin Panel":   None,
     }
-    domain_msg_key = _msg_key_map[st.session_state.domain]
+    domain_msg_key = _msg_key_map.get(st.session_state.domain)
     c1, c2 = st.columns(2)
-    if c1.button("🧹 Clear", use_container_width=True):
+    if domain_msg_key and c1.button("🧹 Clear", use_container_width=True):
         st.session_state[domain_msg_key] = []
         st.session_state.last_sources = []
         st.rerun()
-    if st.session_state[domain_msg_key]:
+    if domain_msg_key and st.session_state[domain_msg_key]:
         transcript = "\n\n".join(
             f"**{m['role'].title()}**: {m['content']}" for m in st.session_state[domain_msg_key]
         )
@@ -1451,5 +1684,6 @@ _ROUTES = {
     "Resume Analyzer":   render_resume,
     "Code Assistant":    render_code,
     "Interview Guider":  render_interview,
+    "🛡️ Admin Panel":   render_admin_panel,
 }
 _ROUTES.get(st.session_state.domain, render_medical)()
