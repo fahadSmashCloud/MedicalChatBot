@@ -205,9 +205,48 @@ def run_agent(
                 max_tokens=1024,
             )
         except Exception as exc:
+            exc_str = str(exc)
+            # Groq returns HTTP 400 with code "output_parse_failed" when the
+            # model generates reasoning text that its function-calling parser
+            # mistakes for a malformed tool call.  Fix: retry the same messages
+            # with tool_choice="none" to force a plain-text final answer.
+            if "output_parse_failed" in exc_str or (
+                hasattr(exc, "status_code") and getattr(exc, "status_code", 0) == 400
+                and "failed_generation" in exc_str
+            ):
+                parse_warn = AgentStep(
+                    step_type="thought",
+                    content=(
+                        "[Auto-recovery] Groq output parser failed on previous response "
+                        "— retrying without tool calls to produce a final answer."
+                    ),
+                    iteration=iteration,
+                )
+                result.steps.append(parse_warn)
+                yield parse_warn
+                try:
+                    fallback = client.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        tool_choice="none",   # force plain text — no tool calls
+                        temperature=0.3,
+                        max_tokens=1024,
+                    )
+                    answer = fallback.choices[0].message.content or "(No response generated.)"
+                    final = AgentStep(
+                        step_type="final",
+                        content=answer,
+                        iteration=iteration,
+                    )
+                    result.steps.append(final)
+                    result.final_answer = answer
+                    yield final
+                    return result
+                except Exception as fallback_exc:
+                    exc_str = f"Groq API error (iteration {iteration}): {fallback_exc}"
             err_step = AgentStep(
                 step_type="error",
-                content=f"Groq API error (iteration {iteration}): {exc}",
+                content=f"Groq API error (iteration {iteration}): {exc_str}",
                 iteration=iteration,
             )
             result.steps.append(err_step)
