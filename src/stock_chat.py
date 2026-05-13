@@ -4,17 +4,25 @@ Talks to Groq's OpenAI-compatible Chat Completions API directly via the `groq`
 SDK (pulled in transitively by `langchain-groq`). Kept independent of the
 LangChain RAG pipeline used by the medical tab so the two flows don't share
 a fragile dependency chain.
+
+Production additions vs. v1:
+  - _make_stream(): retries stream creation up to 2× with exponential back-off
+    (covers transient 429 / 503 errors; skips retry on auth / bad-request).
+  - call_groq_json(): non-streaming call for structured JSON responses
+    (used by the Resume Analyzer to get reliable JSON back).
 """
 
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime
 from typing import Iterable, Iterator
 
 from groq import Groq
 
 MAX_TOKENS = 1500
+MAX_TOKENS_JSON = 2500   # structured analysis needs more headroom
 
 
 # Reuse the same Groq models the medical tab supports.
@@ -27,6 +35,9 @@ STOCK_LLM_MODELS = {
 }
 
 DEFAULT_MODEL = next(iter(STOCK_LLM_MODELS.values()))
+
+# Errors that should NOT be retried (client-side mistakes).
+_NO_RETRY_SIGNALS = ("401", "403", "400", "invalid api key", "bad request", "model_decommissioned")
 
 
 def _client(api_key: str | None = None) -> Groq:
@@ -44,6 +55,34 @@ def build_system_prompt(template: str, psx_data: str) -> str:
     return template.format(psx_data=psx_data, today=today)
 
 
+# ---------------------------------------------------------------------------
+# Internal retry helper
+# ---------------------------------------------------------------------------
+def _make_stream(client: Groq, model: str, messages: list[dict], temperature: float):
+    """Create a Groq streaming completion, retrying up to 2× on transient errors."""
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            return client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=MAX_TOKENS,
+                stream=True,
+            )
+        except Exception as exc:
+            last_err = exc
+            err_lower = str(exc).lower()
+            if any(sig in err_lower for sig in _NO_RETRY_SIGNALS):
+                raise  # don't retry auth / bad-request errors
+            if attempt < 2:
+                time.sleep(2 ** attempt)   # 1s, then 2s
+    raise last_err  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Streaming chat
+# ---------------------------------------------------------------------------
 def stream_chat(
     system_prompt: str,
     history: list[dict],
@@ -56,6 +95,7 @@ def stream_chat(
 
     `history` is a list of {"role": "user"|"assistant", "content": str} dicts.
     The new user_message is appended; the system prompt is sent separately.
+    Retries stream creation up to 2× on transient server errors.
     """
     messages = (
         [{"role": "system", "content": system_prompt}]
@@ -64,13 +104,7 @@ def stream_chat(
     )
 
     client = _client(api_key)
-    stream = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=MAX_TOKENS,
-        stream=True,
-    )
+    stream = _make_stream(client, model, messages, temperature)
 
     for chunk in stream:
         delta = chunk.choices[0].delta.content
@@ -78,6 +112,51 @@ def stream_chat(
             yield delta
 
 
+# ---------------------------------------------------------------------------
+# Non-streaming JSON call (for structured outputs like resume analysis)
+# ---------------------------------------------------------------------------
+def call_groq_json(
+    system_prompt: str,
+    user_prompt: str,
+    model: str = DEFAULT_MODEL,
+    api_key: str | None = None,
+) -> str:
+    """Non-streaming Groq call intended for structured JSON responses.
+
+    Uses temperature=0.1 for reliability. Retries up to 2× on transient errors.
+    Returns the raw response string (the caller parses JSON).
+    """
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+    client = _client(api_key)
+    last_err: Exception | None = None
+
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=MAX_TOKENS_JSON,
+                stream=False,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as exc:
+            last_err = exc
+            err_lower = str(exc).lower()
+            if any(sig in err_lower for sig in _NO_RETRY_SIGNALS):
+                raise
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+
+    raise last_err  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# History helper
+# ---------------------------------------------------------------------------
 def history_for_chat(messages: Iterable[dict], max_turns: int = 4) -> list[dict]:
     """Filter Streamlit-style messages into the role/content shape Groq expects.
 

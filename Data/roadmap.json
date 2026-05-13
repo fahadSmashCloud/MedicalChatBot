@@ -1,0 +1,628 @@
+{
+  "updated": "2026-05-12T14:27:32",
+  "tracks": [
+    {
+      "id": "data_engineering",
+      "name": "Data Engineering",
+      "description": "Pipelines, warehouses, big-data \u2014 the modern stack.",
+      "milestones": [
+        {
+          "id": "de-1",
+          "title": "SQL: window functions, CTEs, query plans",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-2",
+          "title": "Snowflake architecture + SnowSQL + Snowpark",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-3",
+          "title": "dbt: models, tests, exposures, semantic layer",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-4",
+          "title": "Airflow / Prefect / Dagster orchestration",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-5",
+          "title": "Apache Spark (PySpark, Spark SQL, tuning)",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-6",
+          "title": "Kafka: topics, partitions, consumer groups",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-7",
+          "title": "Delta Lake / Iceberg lakehouse format",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-8",
+          "title": "Streaming: Flink or Spark Structured Streaming",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-9",
+          "title": "Data modelling: Kimball, Inmon, Data Vault",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "de-10",
+          "title": "Cost optimisation on Snowflake/BigQuery",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "data_analysis",
+      "name": "Data Analysis & BI",
+      "description": "From raw data to dashboards stakeholders actually use.",
+      "milestones": [
+        {
+          "id": "da-1",
+          "title": "SQL advanced (analytic functions, performance)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "da-2",
+          "title": "Pandas + Polars proficiency",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "da-3",
+          "title": "Statistics: hypothesis testing, A/B tests",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "da-4",
+          "title": "Tableau or Power BI dashboards",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "da-5",
+          "title": "Storytelling with data (Cole Knaflic)",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "da-6",
+          "title": "dbt + Looker / Metabase semantic layer",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "da-7",
+          "title": "Causal inference basics (DAGs, IV, DiD)",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "python_mastery",
+      "name": "Python Mastery",
+      "description": "Beyond syntax \u2014 performance, async, packaging, internals.",
+      "milestones": [
+        {
+          "id": "py-1",
+          "title": "Type hints + mypy strict",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "py-2",
+          "title": "AsyncIO + httpx + concurrent.futures",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "py-3",
+          "title": "Testing: pytest fixtures, mocking, coverage",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "py-4",
+          "title": "Packaging: pyproject.toml, hatchling, uv",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "py-5",
+          "title": "Profiling: py-spy, scalene, memory_profiler",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "py-6",
+          "title": "C-extensions / Cython / mypyc / Rust via PyO3",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "py-7",
+          "title": "CPython internals (GIL, GC, bytecode)",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "py-8",
+          "title": "FastAPI / Pydantic v2 production patterns",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "oracle_db",
+      "name": "Oracle & Databases",
+      "description": "Deep RDBMS + Oracle ecosystem.",
+      "milestones": [
+        {
+          "id": "or-1",
+          "title": "PL/SQL: procedures, packages, triggers",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "or-2",
+          "title": "Indexes, partitions, query plans (Oracle)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "or-3",
+          "title": "Oracle APEX low-code apps",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "or-4",
+          "title": "RAC, Data Guard, RMAN backups",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "or-5",
+          "title": "Performance tuning (AWR, ASH reports)",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "or-6",
+          "title": "Oracle Cloud Infrastructure (OCI) basics",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "or-7",
+          "title": "PostgreSQL & SQL Server comparative depth",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "odoo_erp",
+      "name": "Odoo & ERP",
+      "description": "ERP customisation and full-stack module development.",
+      "milestones": [
+        {
+          "id": "od-1",
+          "title": "Odoo architecture + ORM + XML views",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "od-2",
+          "title": "Build a custom Odoo module from scratch",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "od-3",
+          "title": "QWeb reports + website templates",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "od-4",
+          "title": "Inheritance: extending core models cleanly",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "od-5",
+          "title": "Odoo.sh deployment + CI",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "od-6",
+          "title": "Odoo Studio / no-code for stakeholders",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "od-7",
+          "title": "Performance: SQL views, computed fields",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "system_design",
+      "name": "System Design",
+      "description": "Designing services that handle real scale.",
+      "milestones": [
+        {
+          "id": "sd-1",
+          "title": "CAP theorem, consistency models, quorum",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "sd-2",
+          "title": "Caching strategies (write-through, cache-aside)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "sd-3",
+          "title": "Queues vs streams (SQS, Kafka, Pub/Sub)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "sd-4",
+          "title": "Designing for idempotency + exactly-once",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "sd-5",
+          "title": "Sharding, partitioning, hot keys",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "sd-6",
+          "title": "Rate limiting + circuit breakers",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "sd-7",
+          "title": "Multi-region active/active design",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "sd-8",
+          "title": "Read 'Designing Data-Intensive Applications'",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "cloud",
+      "name": "Cloud (AWS / GCP / Azure)",
+      "description": "Pick one cloud and go deep \u2014 generalise later.",
+      "milestones": [
+        {
+          "id": "cl-1",
+          "title": "IAM done right (least privilege, roles)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "cl-2",
+          "title": "Networking: VPC, subnets, peering, NAT",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "cl-3",
+          "title": "Compute + serverless (EC2/EKS/Lambda equivs)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "cl-4",
+          "title": "Managed data (RDS, DynamoDB, S3, Redshift)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "cl-5",
+          "title": "Infra as code: Terraform OR Pulumi",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "cl-6",
+          "title": "Observability: CloudWatch / OpenTelemetry",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "cl-7",
+          "title": "Cost engineering (FinOps fundamentals)",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "cl-8",
+          "title": "Cloud-native cert (AWS SA Pro / GCP PCA)",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "ai_ml",
+      "name": "AI / ML Engineering",
+      "description": "LLM apps, RAG, fine-tuning, MLOps \u2014 where the market is moving.",
+      "milestones": [
+        {
+          "id": "ai-1",
+          "title": "LLM API fluency (OpenAI, Anthropic, Groq)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "ai-2",
+          "title": "Prompt engineering + structured outputs",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "ai-3",
+          "title": "RAG: chunking, embeddings, vector DBs",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "ai-4",
+          "title": "Agentic workflows (function calling, tools)",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "ai-5",
+          "title": "Fine-tuning: LoRA / QLoRA on open weights",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "ai-6",
+          "title": "Eval pipelines (Ragas, lm-eval, hallucination)",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "ai-7",
+          "title": "Production: streaming, caching, guardrails",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "ai-8",
+          "title": "ML basics: scikit-learn, XGBoost, fundamentals",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "ai-9",
+          "title": "Deploy a small model to prod (vLLM/TGI)",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "devops",
+      "name": "DevOps & Platform",
+      "description": "Containers, CI/CD, infra automation \u2014 own your deploys.",
+      "milestones": [
+        {
+          "id": "do-1",
+          "title": "Docker: multi-stage builds, layer caching",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "do-2",
+          "title": "Kubernetes: pods, services, ingress, helm",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "do-3",
+          "title": "CI/CD with GitHub Actions or GitLab CI",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "do-4",
+          "title": "Terraform modules and remote state",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "do-5",
+          "title": "Prometheus + Grafana monitoring",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "do-6",
+          "title": "Service mesh (Istio / Linkerd)",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "do-7",
+          "title": "Blue/green + canary deploy strategies",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "fullstack_craft",
+      "name": "Full-Stack Craft",
+      "description": "The senior-engineer fundamentals that age well.",
+      "milestones": [
+        {
+          "id": "fs-1",
+          "title": "Clean Architecture / Hexagonal",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "fs-2",
+          "title": "DDD basics: bounded contexts, aggregates",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "fs-3",
+          "title": "TDD discipline + property-based testing",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "fs-4",
+          "title": "OWASP top 10 + auth patterns (OAuth2, JWT)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "fs-5",
+          "title": "React/Next.js modern patterns (RSC, suspense)",
+          "level": "core",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "fs-6",
+          "title": "TypeScript advanced (generics, conditionals)",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "fs-7",
+          "title": "Mentor a junior + lead a tech-spec review",
+          "level": "expert",
+          "done": false,
+          "notes": ""
+        },
+        {
+          "id": "fs-8",
+          "title": "Write & publish 12+ technical blog posts",
+          "level": "advanced",
+          "done": false,
+          "notes": ""
+        }
+      ]
+    }
+  ]
+}

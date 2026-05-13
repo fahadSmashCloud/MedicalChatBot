@@ -1,16 +1,40 @@
+# ── Core LangChain stack ──────────────────────────────────────────────────────
 langchain
 langchain-community
 langchain-core
 langchain-huggingface
 langchain-groq
 huggingface-hub
-sentence-transformers
-faiss-cpu
-streamlit
-pypdf
-python-dotenv
 
-# Stock module
+# ── ML / AI libraries ─────────────────────────────────────────────────────────
+# sentence-transformers: Bi-encoder models for semantic similarity & embeddings
+#   Used in: FAISS vector store (RAG pipeline) + Interview Guider (PyTorch cosine scoring)
+sentence-transformers
+
+# torch: PyTorch deep learning framework (pulled in by sentence-transformers)
+#   Used directly in interview_guide.py:
+#     - model.encode(..., convert_to_tensor=True) → torch.Tensor (shape: [2, 384])
+#     - torch.dot(embeddings[0], embeddings[1])   → cosine similarity scalar
+#   Explicit listing makes the ML dependency visible and version-pinnable.
+torch
+
+# faiss-cpu: Facebook AI Similarity Search — vector index for RAG retrieval
+#   Used in: helper.py — stores and searches document chunk embeddings
+faiss-cpu
+
+# ── LLM API ───────────────────────────────────────────────────────────────────
+groq                # Groq SDK — direct streaming + structured JSON calls (stock_chat.py)
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+streamlit
+
+# ── Document processing ───────────────────────────────────────────────────────
+pypdf               # PDF text extraction (resume_analyzer.py, helper.py)
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv       # .env file loading
+
+# ── Stock / Jobs modules ──────────────────────────────────────────────────────
 requests
 beautifulsoup4
 lxml
