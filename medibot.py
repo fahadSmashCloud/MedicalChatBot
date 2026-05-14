@@ -49,6 +49,7 @@ from src import stocks, jobs, roadmap
 from src import resume_analyzer, code_assistant, interview_guide
 from src import auth as auth_module
 from src import agent_core, agent_tools
+from src import quant_agent
 
 load_dotenv(find_dotenv())
 
@@ -306,6 +307,10 @@ def init_state():
         "agent_steps":         [],       # list[AgentStep] from last run
         "agent_task":          "",       # last task string
         "agent_enabled_tools": [t.name for t in agent_tools.TOOLS],
+        # quant agent
+        "quant_asset":   "BTC",
+        "quant_result":  None,
+        "quant_error":   "",
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -484,6 +489,7 @@ DOMAINS = [
     "Code Assistant",
     "Interview Guider",
     "🤖 Agentic AI",
+    "📈 Quant Agent",
 ]
 ADMIN_DOMAINS = DOMAINS + ["🛡️ Admin Panel"]
 
@@ -856,6 +862,41 @@ with st.sidebar:
             st.rerun()
         st.caption(f"🤖 `{STOCK_LLM_MODELS[st.session_state.agent_model_label]}`")
 
+    elif st.session_state.domain == "📈 Quant Agent":
+        st.header("📈 Quant Agent")
+        asset_options = list(quant_agent.ASSET_UNIVERSE.keys())
+        if st.session_state.quant_asset not in asset_options:
+            st.session_state.quant_asset = asset_options[0]
+        st.session_state.quant_asset = st.selectbox(
+            "Asset",
+            asset_options,
+            index=asset_options.index(st.session_state.quant_asset),
+            format_func=lambda a: f"{a}  ·  {quant_agent.ASSET_UNIVERSE[a]['kind']}",
+            key="quant_asset_sel",
+        )
+        st.divider()
+        if st.button("🚀 Run Analysis", use_container_width=True, type="primary",
+                     key="quant_run_btn"):
+            st.session_state.quant_result = None
+            st.session_state.quant_error  = ""
+            try:
+                with st.spinner(f"Running 4-agent pipeline for {st.session_state.quant_asset}…"):
+                    st.session_state.quant_result = quant_agent.QuantAgentModule().run(
+                        st.session_state.quant_asset
+                    )
+            except Exception as exc:
+                st.session_state.quant_error = str(exc)
+            st.rerun()
+        if st.button("🗑 Clear results", use_container_width=True, key="quant_clear_btn"):
+            st.session_state.quant_result = None
+            st.session_state.quant_error  = ""
+            st.rerun()
+        st.divider()
+        st.caption(
+            "Pipeline: Market → TA → News → Signal. "
+            "Sources: Yahoo Finance / CoinGecko / DuckDuckGo."
+        )
+
     else:  # Code Assistant
         st.header("💻 Code Assistant")
         st.session_state.code_model_label = st.selectbox("LLM",
@@ -898,6 +939,7 @@ with st.sidebar:
         "Code Assistant":    "messages_code",
         "Interview Guider":  "messages_interview",
         "🤖 Agentic AI":    None,   # agent has its own step-based UI, no chat buffer
+        "📈 Quant Agent":   None,   # quant has its own dashboard UI, no chat buffer
         "🛡️ Admin Panel":   None,
     }
     domain_msg_key = _msg_key_map.get(st.session_state.domain)
@@ -1916,6 +1958,138 @@ def render_agent() -> None:
 
 
 # ============================================================================
+# MAIN — Quant Agent
+# ============================================================================
+def render_quant() -> None:
+    st.markdown('<div class="main-header">📈 AI Quant Agent</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="subtle">A 4-agent pipeline that fetches market data, '
+        'computes technical indicators, scores news sentiment, and generates a '
+        'BUY / SELL / HOLD signal — for stocks and crypto.</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="disclaimer">⚠️ <strong>Educational only — not financial advice.</strong> '
+        'Signals are rule-based heuristics, not predictions.</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.session_state.quant_error:
+        st.error(f"Pipeline failed: {st.session_state.quant_error}")
+        return
+
+    result = st.session_state.quant_result
+    if not result:
+        st.info(
+            "👉 Choose an asset in the sidebar and click **Run Analysis** "
+            "to launch the agent pipeline."
+        )
+        st.markdown(
+            "**Pipeline stages**\n\n"
+            "1. **MarketAgent** — live price + 3-month OHLCV from Yahoo Finance "
+            "(CoinGecko fallback for crypto).\n"
+            "2. **TAAgent** — RSI(14), SMA(20/50), EMA(12/26), MACD + signal line.\n"
+            "3. **NewsAgent** — recent headlines via DuckDuckGo, scored with a "
+            "finance-sentiment lexicon.\n"
+            "4. **SignalAgent** — combines the three streams into a "
+            "rule-based BUY / SELL / HOLD with a confidence score and an "
+            "explainable rationale."
+        )
+        return
+
+    snap = result["market"]
+    ta   = result["technical"]
+    news = result["news"]
+    sig  = result["signal"]
+
+    # ── Final signal card ─────────────────────────────────────────────────────
+    sig_color = {"BUY": "#16a34a", "SELL": "#dc2626", "HOLD": "#ca8a04"}[sig.signal]
+    st.markdown(
+        f"""
+        <div style="border:2px solid {sig_color}; border-radius:12px;
+                    padding:18px 22px; margin: 6px 0 18px 0;
+                    background: rgba(255,255,255,0.03);">
+          <div style="font-size:14px; opacity:0.8;">Final signal for <b>{snap.asset}</b></div>
+          <div style="font-size:42px; font-weight:800; color:{sig_color};
+                      letter-spacing:1px; line-height:1.1;">{sig.signal}</div>
+          <div style="font-size:14px; opacity:0.9;">Confidence: <b>{sig.confidence}%</b></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── Market summary ────────────────────────────────────────────────────────
+    st.subheader("💹 Market summary")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Price", f"{snap.price:,.2f} {snap.currency}",
+              f"{snap.change_pct_24h:+.2f}% 24h")
+    m2.metric("Volume", f"{snap.volume:,.0f}")
+    m3.metric("Kind", snap.kind.title())
+    m4.metric("Source", snap.source)
+    if not snap.ohlcv.empty:
+        st.line_chart(snap.ohlcv["close"], height=220)
+
+    # ── Technical analysis ────────────────────────────────────────────────────
+    st.subheader("📊 Technical analysis")
+    t1, t2, t3, t4 = st.columns(4)
+    t1.metric("RSI(14)", f"{ta.rsi:.1f}",
+              "oversold" if ta.rsi < 30 else ("overbought" if ta.rsi > 70 else "neutral"))
+    t2.metric("MACD", f"{ta.macd:+.3f}", ta.macd_state)
+    t3.metric("SMA 20 / 50", f"{ta.sma_20:,.2f} / {ta.sma_50:,.2f}")
+    t4.metric("Trend", ta.trend.upper())
+
+    # ── News sentiment ────────────────────────────────────────────────────────
+    st.subheader("📰 News sentiment")
+    sent_color = {"positive": "🟢", "negative": "🔴", "neutral": "⚪"}[news.sentiment]
+    st.markdown(
+        f"{sent_color} **{news.sentiment.title()}** "
+        f"(avg score: `{news.score:+.2f}`, {len(news.headlines)} headlines)"
+    )
+    for h in news.headlines[:6]:
+        tag = "🟢" if h["score"] > 0 else ("🔴" if h["score"] < 0 else "⚪")
+        if h.get("url"):
+            st.markdown(f"- {tag} [{h['title']}]({h['url']})  "
+                        f"<span style='opacity:0.6'>· {h.get('source','')}</span>",
+                        unsafe_allow_html=True)
+        else:
+            st.markdown(f"- {tag} {h['title']}")
+
+    # ── Rationale ─────────────────────────────────────────────────────────────
+    st.subheader("🧠 Why this signal?")
+    for r in sig.rationale:
+        st.markdown(f"- {r}")
+
+    # ── Raw JSON (collapsible) ────────────────────────────────────────────────
+    with st.expander("🔍 Raw pipeline output (JSON)"):
+        import json as _json
+        st.code(
+            _json.dumps({
+                "market": {
+                    "asset": snap.asset, "kind": snap.kind, "price": snap.price,
+                    "change_pct_24h": snap.change_pct_24h, "volume": snap.volume,
+                    "currency": snap.currency, "source": snap.source,
+                    "fetched_at": snap.fetched_at,
+                },
+                "technical": {
+                    "rsi": ta.rsi, "sma_20": ta.sma_20, "sma_50": ta.sma_50,
+                    "ema_12": ta.ema_12, "ema_26": ta.ema_26,
+                    "macd": ta.macd, "macd_signal": ta.macd_signal,
+                    "macd_state": ta.macd_state, "trend": ta.trend,
+                },
+                "news": {
+                    "sentiment": news.sentiment, "score": news.score,
+                    "headlines": news.headlines,
+                },
+                "signal": {
+                    "signal": sig.signal, "confidence": sig.confidence,
+                    "rationale": sig.rationale,
+                },
+            }, indent=2, default=str),
+            language="json",
+        )
+
+
+# ============================================================================
 # Route
 # ============================================================================
 _ROUTES = {
@@ -1927,6 +2101,7 @@ _ROUTES = {
     "Code Assistant":    render_code,
     "Interview Guider":  render_interview,
     "🤖 Agentic AI":    render_agent,
+    "📈 Quant Agent":   render_quant,
     "🛡️ Admin Panel":   render_admin_panel,
 }
 _ROUTES.get(st.session_state.domain, render_medical)()
