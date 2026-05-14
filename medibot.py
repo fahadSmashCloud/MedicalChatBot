@@ -493,6 +493,13 @@ DOMAINS = [
 ]
 ADMIN_DOMAINS = DOMAINS + ["🛡️ Admin Panel"]
 
+# Regular (non-superadmin) users are restricted to these three domains.
+USER_DOMAINS = [
+    "Medical (RAG)",
+    "Career Roadmap",
+    "📈 Quant Agent",
+]
+
 # ── Auth gate — block everything if not signed in ───────────────────────────
 if not st.session_state.auth_user:
     render_auth_gate()
@@ -552,7 +559,7 @@ with st.sidebar:
     )
     st.divider()
 
-    _domain_list = ADMIN_DOMAINS if _is_superadmin else DOMAINS
+    _domain_list = ADMIN_DOMAINS if _is_superadmin else USER_DOMAINS
     if st.session_state.domain not in _domain_list:
         st.session_state.domain = "Medical (RAG)"
     st.session_state.domain = st.radio(
