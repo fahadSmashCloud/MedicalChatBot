@@ -18,9 +18,25 @@ sentence-transformers
 #   Explicit listing makes the ML dependency visible and version-pinnable.
 torch
 
-# faiss-cpu: Facebook AI Similarity Search — vector index for RAG retrieval
+# faiss-cpu: Facebook AI Similarity Search — vector index for RAG retrieval (local fallback)
 #   Used in: helper.py — stores and searches document chunk embeddings
 faiss-cpu
+
+# pinecone: cloud vector DB — primary Medical RAG backend when PINECONE_API_KEY is set
+#   Used in: src/pinecone_store.py
+pinecone
+
+# scikit-learn: t-SNE + k-means for the Vector Explorer tab
+#   Used in: src/vector_viz.py
+scikit-learn
+
+# plotly: interactive scatter plot for the Vector Explorer tab
+#   Used in: medibot.py (render_vector_explorer)
+plotly
+
+# chess: board state, legal-move validation, SVG rendering for the Chess tab
+#   Used in: src/chess_game.py
+chess
 
 # ── LLM API ───────────────────────────────────────────────────────────────────
 groq                # Groq SDK — direct streaming + structured JSON calls (stock_chat.py)

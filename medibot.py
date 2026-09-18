@@ -50,6 +50,8 @@ from src import resume_analyzer, code_assistant, interview_guide
 from src import auth as auth_module
 from src import agent_core, agent_tools
 from src import quant_agent
+from src import vector_viz, chess_game
+from src import pinecone_store
 
 load_dotenv(find_dotenv())
 
@@ -311,6 +313,16 @@ def init_state():
         "quant_asset":   "BTC",
         "quant_result":  None,
         "quant_error":   "",
+        # vector explorer
+        "vecviz_k":       8,
+        "vecviz_result":  None,      # VectorSpaceResult
+        "vecviz_error":   "",
+        # chess
+        "chess_model_label": next(iter(STOCK_LLM_MODELS)),
+        "chess_board":       None,        # chess.Board
+        "chess_history_san": [],
+        "chess_last_move":   None,        # chess.Move, for SVG highlight
+        "chess_status":      "",          # last LLM/error message
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -490,14 +502,18 @@ DOMAINS = [
     "Interview Guider",
     "🤖 Agentic AI",
     "📈 Quant Agent",
+    "🧬 Vector Explorer",
+    "♟️ Chess vs AI",
 ]
 ADMIN_DOMAINS = DOMAINS + ["🛡️ Admin Panel"]
 
-# Regular (non-superadmin) users are restricted to these three domains.
+# Regular (non-superadmin) users are restricted to these domains.
 USER_DOMAINS = [
     "Medical (RAG)",
     "Career Roadmap",
     "📈 Quant Agent",
+    "🧬 Vector Explorer",
+    "♟️ Chess vs AI",
 ]
 
 # ── Auth gate — block everything if not signed in ───────────────────────────
@@ -597,7 +613,8 @@ with st.sidebar:
                 st.error(f"Unexpected error: {e}")
         st.divider()
         try:
-            n = cached_vectorstore().index.ntotal
+            store = cached_vectorstore()
+            n = store.chunk_count() if hasattr(store, "chunk_count") else store.index.ntotal
             st.caption(f"📚 {n:,} indexed chunks")
         except Exception:
             st.caption("📚 Index not loaded")
@@ -904,6 +921,49 @@ with st.sidebar:
             "Sources: Yahoo Finance / CoinGecko / DuckDuckGo."
         )
 
+    elif st.session_state.domain == "🧬 Vector Explorer":
+        st.header("🧬 Vector Explorer settings")
+        if not pinecone_store.is_configured():
+            st.warning("PINECONE_API_KEY not set — nothing to visualize (this only reads the live Pinecone index).")
+        st.session_state.vecviz_k = st.slider(
+            "Clusters (k-means)", 2, 20, st.session_state.vecviz_k,
+            help="Number of color groups to split the embedding space into.",
+        )
+        st.divider()
+        if st.button("📊 Generate visualization", use_container_width=True, type="primary",
+                     key="vecviz_run_btn"):
+            st.session_state.vecviz_result = None
+            st.session_state.vecviz_error  = ""
+            try:
+                with st.spinner("Fetching vectors + running t-SNE + k-means (can take a few minutes)…"):
+                    st.session_state.vecviz_result = vector_viz.build_vector_space(st.session_state.vecviz_k)
+            except Exception as exc:
+                st.session_state.vecviz_error = str(exc)
+            st.rerun()
+        if st.button("🗑 Clear", use_container_width=True, key="vecviz_clear_btn"):
+            st.session_state.vecviz_result = None
+            st.session_state.vecviz_error  = ""
+            st.rerun()
+        st.divider()
+        st.caption(f"Index: `{pinecone_store.index_name()}`")
+
+    elif st.session_state.domain == "♟️ Chess vs AI":
+        st.header("♟️ Chess settings")
+        st.session_state.chess_model_label = st.selectbox(
+            "Groq model (plays Black)",
+            list(STOCK_LLM_MODELS.keys()),
+            index=list(STOCK_LLM_MODELS.keys()).index(st.session_state.chess_model_label),
+        )
+        st.divider()
+        if st.button("♻️ New game", use_container_width=True, key="chess_new_btn"):
+            st.session_state.chess_board       = chess_game.new_board()
+            st.session_state.chess_history_san = []
+            st.session_state.chess_last_move   = None
+            st.session_state.chess_status      = ""
+            st.rerun()
+        st.divider()
+        st.caption("You play White. Enter moves in SAN (e.g. `Nf3`) or UCI (e.g. `g1f3`).")
+
     else:  # Code Assistant
         st.header("💻 Code Assistant")
         st.session_state.code_model_label = st.selectbox("LLM",
@@ -947,6 +1007,8 @@ with st.sidebar:
         "Interview Guider":  "messages_interview",
         "🤖 Agentic AI":    None,   # agent has its own step-based UI, no chat buffer
         "📈 Quant Agent":   None,   # quant has its own dashboard UI, no chat buffer
+        "🧬 Vector Explorer": None, # own result-based UI, no chat buffer
+        "♟️ Chess vs AI":    None,  # own board-based UI, no chat buffer
         "🛡️ Admin Panel":   None,
     }
     domain_msg_key = _msg_key_map.get(st.session_state.domain)
@@ -2097,6 +2159,125 @@ def render_quant() -> None:
 
 
 # ============================================================================
+# MAIN — Vector Explorer
+# ============================================================================
+def render_vector_explorer() -> None:
+    st.markdown('<div class="main-header">🧬 Vector Explorer</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="subtle">A 2D map of every chunk in the Medical RAG Pinecone index — '
+        't-SNE for layout, k-means for coloring. Shows what the embedding space actually '
+        'looks like.</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.session_state.vecviz_error:
+        st.error(f"Visualization failed: {st.session_state.vecviz_error}")
+        return
+
+    result = st.session_state.vecviz_result
+    if not result:
+        st.info(
+            "👉 Click **Generate visualization** in the sidebar. "
+            "It fetches every vector from Pinecone and runs t-SNE + k-means — "
+            "can take a few minutes on a large index."
+        )
+        return
+
+    import pandas as pd
+    import plotly.express as px
+
+    df = pd.DataFrame({
+        "x": result.x,
+        "y": result.y,
+        "cluster": [str(c) for c in result.cluster],
+        "text": result.text,
+        "source": result.source,
+        "page": [p + 1 if isinstance(p, int) else "?" for p in result.page],
+    })
+
+    fig = px.scatter(
+        df, x="x", y="y", color="cluster",
+        hover_data={"source": True, "page": True, "text": True, "x": False, "y": False},
+        title=f"{result.n_vectors:,} chunks · {df['cluster'].nunique()} clusters",
+    )
+    fig.update_traces(marker=dict(size=5, opacity=0.7))
+    fig.update_layout(height=650, legend_title_text="Cluster")
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(f"📚 {result.n_vectors:,} vectors · index `{pinecone_store.index_name()}`")
+
+
+# ============================================================================
+# MAIN — Chess vs AI
+# ============================================================================
+def render_chess() -> None:
+    st.markdown('<div class="main-header">♟️ Chess vs AI</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="subtle">You play White. Groq plays Black — it picks from the '
+        'legal-move list each turn (validated by python-chess; falls back to a random '
+        'legal move if it ever replies with something illegal).</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not os.environ.get("GROQ_API_KEY"):
+        st.error("**GROQ_API_KEY is not set.** Add it to your .env file.")
+        return
+
+    if st.session_state.chess_board is None:
+        st.session_state.chess_board = chess_game.new_board()
+
+    board = st.session_state.chess_board
+
+    svg = chess_game.board_svg(board, lastmove=st.session_state.chess_last_move)
+    st.components.v1.html(f'<div style="display:flex;justify-content:center">{svg}</div>', height=460)
+
+    status = chess_game.game_status(board)
+    if status:
+        if "White (you) win" in status:
+            st.success(status)
+        else:
+            st.info(status)
+    else:
+        with st.form("chess_move_form", clear_on_submit=True):
+            move_text = st.text_input("Your move (SAN or UCI)", placeholder="e.g. Nf3 or g1f3")
+            submitted = st.form_submit_button("Play move", use_container_width=True)
+        if submitted and move_text.strip():
+            try:
+                move = chess_game.parse_human_move(board, move_text)
+            except ValueError as e:
+                st.error(str(e))
+                return
+            san = board.san(move)  # must compute before push — SAN needs pre-move context
+            board.push(move)
+            st.session_state.chess_history_san.append(san)
+            st.session_state.chess_last_move = move
+            st.session_state.chess_status = ""
+
+            if not chess_game.game_status(board):
+                model_id = STOCK_LLM_MODELS[st.session_state.chess_model_label]
+                with st.spinner("Groq is thinking…"):
+                    try:
+                        result = chess_game.request_llm_move(
+                            board, model_id, st.session_state.chess_history_san
+                        )
+                    except Exception as exc:
+                        st.error(f"Groq move failed: {exc}")
+                        st.stop()
+                board.push(result.move)
+                st.session_state.chess_history_san.append(result.san)
+                st.session_state.chess_last_move = result.move
+                if result.fell_back:
+                    st.session_state.chess_status = "⚠️ Groq's replies were all illegal — played a random legal move instead."
+            st.rerun()
+
+    if st.session_state.chess_status:
+        st.warning(st.session_state.chess_status)
+
+    if st.session_state.chess_history_san:
+        st.divider()
+        st.caption("Move history: " + " ".join(st.session_state.chess_history_san))
+
+
+# ============================================================================
 # Route
 # ============================================================================
 _ROUTES = {
@@ -2109,6 +2290,8 @@ _ROUTES = {
     "Interview Guider":  render_interview,
     "🤖 Agentic AI":    render_agent,
     "📈 Quant Agent":   render_quant,
+    "🧬 Vector Explorer": render_vector_explorer,
+    "♟️ Chess vs AI":    render_chess,
     "🛡️ Admin Panel":   render_admin_panel,
 }
 _ROUTES.get(st.session_state.domain, render_medical)()

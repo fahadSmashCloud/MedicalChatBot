@@ -15,6 +15,8 @@ from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from src import pinecone_store
+
 DB_FAISS_PATH = "vectorstore/db_faiss"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
@@ -33,7 +35,10 @@ def get_embedding_model() -> HuggingFaceEmbeddings:
     return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
 
-def load_vectorstore() -> FAISS:
+def load_vectorstore() -> FAISS | pinecone_store.PineconeVectorStore:
+    """Pinecone-backed store when PINECONE_API_KEY is set, else the local FAISS index."""
+    if pinecone_store.is_configured():
+        return pinecone_store.PineconeVectorStore(get_embedding_model())
     return FAISS.load_local(
         DB_FAISS_PATH,
         get_embedding_model(),
@@ -96,6 +101,10 @@ def ingest_uploaded_pdfs(uploaded_files) -> int:
         raise PDFIngestError("PDFs loaded but text-splitting produced no chunks.")
 
     embeddings = get_embedding_model()
+
+    if pinecone_store.is_configured():
+        store = pinecone_store.PineconeVectorStore(embeddings)
+        return store.add_documents(chunks)
 
     if Path(DB_FAISS_PATH).exists():
         db = FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)

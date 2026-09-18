@@ -1,8 +1,12 @@
+from dotenv import find_dotenv, load_dotenv
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
+from src import pinecone_store
+
+load_dotenv(find_dotenv())
 
 DATA_PATH = "Data/"
 DB_FAISS_PATH = "vectorstore/db_faiss"
@@ -32,6 +36,11 @@ if __name__ == "__main__":
 
     embedding_model = get_embedding_model()
 
-    db = FAISS.from_documents(text_chunks, embedding_model)
-    db.save_local(DB_FAISS_PATH)
-    print(f"FAISS index saved to {DB_FAISS_PATH}")
+    if pinecone_store.is_configured():
+        store = pinecone_store.PineconeVectorStore(embedding_model)
+        n = store.add_documents(text_chunks)
+        print(f"Upserted {n} chunks to Pinecone index '{pinecone_store.index_name()}'")
+    else:
+        db = FAISS.from_documents(text_chunks, embedding_model)
+        db.save_local(DB_FAISS_PATH)
+        print(f"FAISS index saved to {DB_FAISS_PATH}")
